@@ -57,6 +57,19 @@ def add_one(dic, value):
     if not dic.has_key(value):
         dic[value] = 0.0
     dic[value] += 1.0
+
+def get_alph(c):
+    if 0x3040 <= ord(c) <= 0x309F:
+        return 'hiragana'
+    elif 0x30A0 <= ord(c) <= 0x30FF:
+        return 'katakana'
+    elif 0xFF01 <= ord(c) <= 0xFFEF:
+        return 'romanji'
+    elif 0x300 <= ord(c) <= 0x303F:
+        return 'punct'
+    else:
+        return 'kanji'
+
 ################################################################################
 
 
@@ -122,14 +135,21 @@ def train(sentences):
     observation_prob = {}
     state_trans_prob = {}
 
+    # init alph_trans_prob values
+    alph_trans_prob = {}
+    alph_type = ["hiragana", "katakana", "romanji", "kanji", "punct"]
+    for alph_prev in alph_type:
+        alph_trans_prob[alph_prev] = {}
+        for alph_curr in alph_type:
+            alph_trans_prob[alph_prev][alph_curr] = {'c': 0, 'b': 0}
+
     # Iterates through the sentences
     for sentence in sentences:
 
         for i in range(len(sentence)):
             sentence[i] = 'c'.join(sentence[i])
-        annotated_sequence = 'b'.join(sentence)+"cW"
+        annotated_sequence = 'b'.join(sentence)
 
-        # TODO
 
         previous_2_state = ''
         previous_state = ''
@@ -139,8 +159,9 @@ def train(sentences):
             observation = annotated_sequence[i:i+5]
             bigram = observation[0] + observation[2]
             trigram = observation[0] + observation[2] + observation[4]
-
             current_state = observation[1]
+
+            alph_trans_prob[get_alph(observation[0])][get_alph(observation[2])][current_state] += 1
 
             if not observation_prob.has_key(trigram):
                 observation_prob[trigram] = {'c': 0.0, 'b': 0.0}
@@ -171,8 +192,17 @@ def train(sentences):
     for t in state_trans_prob:
         state_trans_prob[t] /= norm_factor
 
-    print state_trans_prob
-    return [observation_prob, state_trans_prob]
+    norm_factor = 0.0
+    for i in alph_trans_prob.keys():
+        for j in alph_trans_prob[i].keys():
+            for k in alph_trans_prob[i][j].keys():
+                norm_factor += alph_trans_prob[i][j][k]
+    for i in alph_trans_prob.keys():
+        for j in alph_trans_prob[i].keys():
+            for k in alph_trans_prob[i][j].keys():
+                alph_trans_prob[i][j][k] /= norm_factor
+
+    return [observation_prob, state_trans_prob, alph_trans_prob]
 ################################################################################
 
 
@@ -183,13 +213,14 @@ def word_segmentation(model, sentence):
 
     observation_prob = model[0]
     state_trans_prob = model[1]
+    alph_trans_prob = model[2]
 
-    # FIXME
-    unseen_prob_b = 0.05
-    unseen_prob_c = 0.02
+    unseen_prob_b = 0.02
+    unseen_prob_c = 0.01
 
     observations = []
     lattice = []
+
 
     for i in range(len(sentence)-1):
         bigram = sentence[i:i+2]
@@ -206,7 +237,10 @@ def word_segmentation(model, sentence):
             lattice[-1]['c'] = max(unseen_prob_c, lattice[-1]['c'])
             lattice[-1]['b'] = max(unseen_prob_b, lattice[-1]['b'])
         else:
-            lattice.append({'c': unseen_prob_c, 'b': unseen_prob_b})
+            lattice.append(alph_trans_prob[get_alph(bigram[0])][get_alph(bigram[1])])
+            lattice[-1]['c'] = max(unseen_prob_c, lattice[-1]['c'])
+            lattice[-1]['b'] = max(unseen_prob_b, lattice[-1]['b'])
+
 
     # Use viterbi to decode the lattice
 
