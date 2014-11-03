@@ -8,6 +8,9 @@
 :Authors:
     Florian Boudin (florian.boudin@univ-nantes.fr)
 
+:Update:
+    Carl Goubeau
+
 :Date:
     22 july 2013 (creation)
 
@@ -135,6 +138,7 @@ def train(sentences):
     observation_prob = {}
     state_trans_prob = {}
 
+    #TODO 3-gram classe caracteres !
     # init alph_trans_prob values
     alph_trans_prob = {}
     alph_type = ["hiragana", "katakana", "romanji", "kanji", "punct"]
@@ -148,7 +152,7 @@ def train(sentences):
 
         for i in range(len(sentence)):
             sentence[i] = 'c'.join(sentence[i])
-        annotated_sequence = 'b'.join(sentence)
+        annotated_sequence = ('b'.join(sentence)+"cW")
 
 
         previous_2_state = ''
@@ -201,7 +205,6 @@ def train(sentences):
         for j in alph_trans_prob[i].keys():
             for k in alph_trans_prob[i][j].keys():
                 alph_trans_prob[i][j][k] /= norm_factor
-
     return [observation_prob, state_trans_prob, alph_trans_prob]
 ################################################################################
 
@@ -221,8 +224,8 @@ def word_segmentation(model, sentence):
     observations = []
     lattice = []
 
-
-    for i in range(len(sentence)-1):
+    sentence += "W"
+    for i in range(len(sentence)-2):
         bigram = sentence[i:i+2]
         trigram = sentence[i:i+3]
 
@@ -276,7 +279,7 @@ def word_segmentation(model, sentence):
 
     # Sentence segmentation 
     segmented_sentence = []
-    for i in range(len(sentence)-1):
+    for i in range(len(sentence)-2):
         if best_V[i] == 'c':
             segmented_sentence.append(sentence[i])
         else:
